@@ -10,9 +10,10 @@
 // ==/UserScript==
 
 (function () {
-    // mock XHR
+  // mock XHR
+  var proxy = (function () {
     var realXhr = "__xhr";
-  
+
     var events = [
       "load",
       "loadend",
@@ -21,7 +22,7 @@
       "readystatechange",
       "abort",
     ];
-  
+
     function configEvent(event, xhrProxy) {
       var e = {};
       for (var attr in event) e[attr] = event[attr];
@@ -29,25 +30,25 @@
       e.target = e.currentTarget = xhrProxy;
       return e;
     }
-  
+
     function hook(proxy, win) {
       win = win || window;
       // Avoid double hookAjax
       win[realXhr] = win[realXhr] || win.XMLHttpRequest;
-  
+
       win.XMLHttpRequest = function () {
         // We shouldn't hookAjax XMLHttpRequest.prototype because we can't
         // guarantee that all attributes are on the prototype。
         // Instead, hooking XMLHttpRequest instance can avoid this problem.
-  
+
         var xhr = new win[realXhr]();
-  
+
         // Generate all callbacks(eg. onload) are enumerable (not undefined).
         for (var i = 0; i < events.length; ++i) {
           var key = "on" + events[i];
           if (xhr[key] === undefined) xhr[key] = null;
         }
-  
+
         for (var attr in xhr) {
           var type = "";
           try {
@@ -70,7 +71,7 @@
         };
         this.xhr = xhr;
       };
-  
+
       Object.assign(win.XMLHttpRequest, {
         UNSENT: 0,
         OPENED: 1,
@@ -78,7 +79,7 @@
         LOADING: 3,
         DONE: 4,
       });
-  
+
       // Generate getter for attributes of xhr
       function getterFactory(attr) {
         return function () {
@@ -89,7 +90,7 @@
           return (attrGetterHook && attrGetterHook(v, this)) || v;
         };
       }
-  
+
       // Generate setter for attributes of xhr; by this we have an opportunity
       // to hookAjax event callbacks （eg: `onload`） of xhr;
       function setterFactory(attr) {
@@ -117,7 +118,7 @@
           }
         };
       }
-  
+
       // Hook methods of xhr.
       function hookFunction(fun) {
         return function () {
@@ -131,44 +132,44 @@
           return this.xhr[fun].apply(this.xhr, args);
         };
       }
-  
+
       // Return the real XMLHttpRequest
       return win[realXhr];
     }
-  
+
     function unHook(win) {
       win = win || window;
       if (win[realXhr]) win.XMLHttpRequest = win[realXhr];
       win[realXhr] = undefined;
     }
-  
+
     var eventLoad = events[0],
       eventLoadEnd = events[1],
       eventTimeout = events[2],
       eventError = events[3],
       eventReadyStateChange = events[4],
       eventAbort = events[5];
-  
+
     var prototype = "prototype";
-  
+
     function proxy(proxy, win) {
       win = win || window;
       if (win["__xhr"]) throw "Ajax is already hooked.";
       return proxyAjax(proxy, win);
     }
-  
+
     function unProxy(win) {
       unHook(win);
     }
-  
+
     function trim(str) {
       return str.replace(/^\s+|\s+$/g, "");
     }
-  
+
     function getEventTarget(xhr) {
       return xhr.watcher || (xhr.watcher = document.createElement("a"));
     }
-  
+
     function triggerListener(xhr, name) {
       var xhrProxy = xhr.getProxy();
       var callback = "on" + name + "_";
@@ -184,12 +185,12 @@
       }
       getEventTarget(xhr).dispatchEvent(evt);
     }
-  
+
     function Handler(xhr) {
       this.xhr = xhr;
       this.xhrProxy = xhr.getProxy();
     }
-  
+
     Handler[prototype] = Object.create({
       resolve: function resolve(response) {
         var xhrProxy = this.xhrProxy;
@@ -209,17 +210,17 @@
         triggerListener(this.xhr, eventLoadEnd);
       },
     });
-  
+
     function makeHandler(next) {
       function sub(xhr) {
         Handler.call(this, xhr);
       }
-  
+
       sub[prototype] = Object.create(Handler[prototype]);
       sub[prototype].next = next;
       return sub;
     }
-  
+
     var RequestHandler = makeHandler(function (rq) {
       var xhr = this.xhr;
       rq = rq || xhr.config;
@@ -230,20 +231,20 @@
       }
       xhr.send(rq.body);
     });
-  
+
     var ResponseHandler = makeHandler(function (response) {
       this.resolve(response);
     });
-  
+
     var ErrorHandler = makeHandler(function (error) {
       this.reject(error);
     });
-  
+
     function proxyAjax(proxy, win) {
       var onRequest = proxy.onRequest,
         onResponse = proxy.onResponse,
         onError = proxy.onError;
-  
+
       function handleResponse(xhr, xhrProxy) {
         var handler = new ResponseHandler(xhr);
         var ret = {
@@ -266,7 +267,7 @@
         if (!onResponse) return handler.resolve(ret);
         onResponse(ret, handler);
       }
-  
+
       function onerror(xhr, xhrProxy, error, errorType) {
         var handler = new ErrorHandler(xhr);
         error = { config: xhr.config, error: error, type: errorType };
@@ -276,18 +277,18 @@
           handler.next(error);
         }
       }
-  
+
       function preventXhrProxyCallback() {
         return true;
       }
-  
+
       function errorCallback(errorType) {
         return function (xhr, e) {
           onerror(xhr, this, e, errorType);
           return true;
         };
       }
-  
+
       function stateChangeCallback(xhr, xhrProxy) {
         if (xhr.readyState === 4 && xhr.status !== 0) {
           handleResponse(xhr, xhrProxy);
@@ -296,7 +297,7 @@
         }
         return true;
       }
-  
+
       return hook(
         {
           onload: preventXhrProxyCallback,
@@ -322,7 +323,7 @@
                 return stateChangeCallback(xhr, _this);
               };
             }
-  
+
             // 如果有请求拦截器，则在调用onRequest后再打开链接。因为onRequest最佳调用时机是在send前，
             // 所以我们在send拦截函数中再手动调用open，因此返回true阻止xhr.open调用。
             //
@@ -382,26 +383,28 @@
         win
       );
     }
-  
-    proxy({
-      //请求成功后进入
-      onResponse: (response, handler) => {
-        // 拦截 获取
-        if (response.config.url.includes('/web/product/detail')) {
-            var res = response.response
-            // 可以直接挂号
-            if (true) {
 
-            }
-        }
-
-        if (response.config.url.includes('/web/product/detail')) {
-            
-
-        }
-        console.log(response.response);
-        handler.next(response);
-      },
-    });
+    return proxy;
   })();
-  
+
+
+
+  proxy({
+    //请求成功后进入
+    onResponse: (response, handler) => {
+      var res = response.response;
+      // todo 需要看下 定点刷新当前选择工作日的就医情况
+      if (response.config.url.includes("/web/product/detail")) {
+        res.data.forEach((item) => {
+          // 是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
+          // 是否有手机验证码  => smsCode（'12345' 或者 ''）
+        });
+      }
+
+      if (response.config.url.includes("/web/product/detail")) {
+      }
+      console.log(response.response);
+      handler.next(response);
+    },
+  });
+})();
