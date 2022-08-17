@@ -387,7 +387,36 @@
     return proxy;
   })();
 
-
+  // 114 里个人用户信息
+  var userInfo = {
+    patientName: "孙权",
+    idCardType: "IDENTITY_CARD",
+    idCardTypeView: "居民身份证",
+    idCardNo: "341202199510123515",
+    idCardNoView: "3412****3515",
+    phone: "17356535320",
+    status: "BIND",
+    statusTips: "",
+    cardList: [
+      {
+        cardType: "SOCIAL_SECURITY",
+        cardTypeView: "社保卡",
+        cardNo: "128711820009",
+        cardNoView: "1287****0009",
+        medicareType: "MEDICARE_CARD",
+        medicareTypeView: "医保",
+      },
+      {
+        cardType: "IDENTITY_CARD",
+        cardTypeView: "居民身份证",
+        cardNo: "341202199510123515",
+        cardNoView: "3412****3515",
+        medicareType: "SELF_PAY_CARD",
+        medicareTypeView: "自费",
+      },
+    ],
+    options: [],
+  };
 
   proxy({
     //请求成功后进入
@@ -395,6 +424,8 @@
       var res = response.response;
       // todo 需要看下 定点刷新当前选择工作日的就医情况
       if (response.config.url.includes("/web/product/detail")) {
+        console.log(response.response);
+
         res.data.forEach((item) => {
           // 是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
           // 是否有手机验证码  => smsCode（'12345' 或者 ''）
@@ -403,7 +434,37 @@
 
       if (response.config.url.includes("/web/product/detail")) {
       }
-      console.log(response.response);
+
+      // 挂号接口超过7次失败会弹窗，如： 您的账号于2022-08-18登录失败次数已达7次，请在重新获取验证码后重试
+      var registerRequestBody = {
+        // 就诊人信息
+        cardNo: userInfo.cardList[0].cardNo,
+        cardType: userInfo.cardList[0].cardType,
+        phone: userInfo.phone,
+        //
+        hosCode: "230",
+        firstDeptCode: "0",
+        secondDeptCode: "200003658",
+        uniqProductKey: "5246c677f525c1ce4a748529f571608beef55848",
+        treatmentDay: "2022-08-20",
+        dutyTime: 0, //是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
+
+        hospitalCardId: "",
+        orderFrom: "DEPT", // 可写死标记挂号来源，比如通过推荐医院等等
+        smsCode: "123456", // 是否有手机验证码  => smsCode（'12345' 或者 ''）
+      };
+
+      // TODO 发送请求
+      fetch(`/web/order/save?_time=${+new Date()}`, {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(registerRequestBody),
+      }).then((response) => {
+        var res = response.json();
+        
+      }, console.error);
+
+      // TODO 处理验证码
       handler.next(response);
     },
   });
