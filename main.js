@@ -387,6 +387,8 @@
     return proxy;
   })();
 
+  // 怎么加密的，用密钥加密的吗
+  var encryPhone = 'ujU8xZr2WOeyikrLK8ZhtQ%3D%3D';
   // 114 里个人用户信息
   var userInfo = {
     patientName: "孙权",
@@ -418,53 +420,71 @@
     options: [],
   };
 
+  function getRegisterRequestBody() {
+    var pathnameArr = location.pathname.split("/");
+    // 挂号接口超过7次失败会弹窗，如： 您的账号于2022-08-18登录失败次数已达7次，请在重新获取验证码后重试
+    var registerRequestBody = {
+      // 就诊人信息
+      cardNo: userInfo.cardList[0].cardNo,
+      cardType: userInfo.cardList[0].cardType,
+      phone: userInfo.phone,
+      //
+      hosCode: pathnameArr[2],
+      firstDeptCode:  pathnameArr[3],
+      secondDeptCode: pathnameArr[4],
+      uniqProductKey:
+      treatmentDay: "2022-08-20",
+      dutyTime: 0, //是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
+
+      hospitalCardId: "",
+      orderFrom: "DEPT", // 可写死标记挂号来源，比如通过推荐医院等等
+      smsCode: "123456", // 是否有手机验证码  => smsCode（'12345' 或者 ''）
+    };
+
+    return registerRequestBody
+  }
+
   proxy({
     //请求成功后进入
     onResponse: (response, handler) => {
       var res = response.response;
       // todo 需要看下 定点刷新当前选择工作日的就医情况
       if (response.config.url.includes("/web/product/detail")) {
-        console.log(response.response);
+        // console.log(response.response);
 
-        res.data.forEach((item) => {
-          // 是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
-          // 是否有手机验证码  => smsCode（'12345' 或者 ''）
-        });
+        if (res.code === 0) {
+          res &&
+          (res.data || []).forEach((item) => {
+            var dutyTime = '0'
+            var smsCode = ''
+            // 是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
+            if (item.period.length) {
+              // 目前默认选择第一个
+              dutyTime = item.period[0].dutyTime
+            }
+            // 是否有手机验证码  => smsCode（'12345' 或者 ''）
+          });
+        }
       }
 
-      if (response.config.url.includes("/web/product/detail")) {
-      }
+      // if (response.config.url.includes("/web/product/detail")) {
+      // }
 
-      // 挂号接口超过7次失败会弹窗，如： 您的账号于2022-08-18登录失败次数已达7次，请在重新获取验证码后重试
-      var registerRequestBody = {
-        // 就诊人信息
-        cardNo: userInfo.cardList[0].cardNo,
-        cardType: userInfo.cardList[0].cardType,
-        phone: userInfo.phone,
-        //
-        hosCode: "230",
-        firstDeptCode: "0",
-        secondDeptCode: "200003658",
-        uniqProductKey: "5246c677f525c1ce4a748529f571608beef55848",
-        treatmentDay: "2022-08-20",
-        dutyTime: 0, //是否有period（上下午选择具体时间段） => dutyTime（'202208191300-202208191630' 或者 '0'）
 
-        hospitalCardId: "",
-        orderFrom: "DEPT", // 可写死标记挂号来源，比如通过推荐医院等等
-        smsCode: "123456", // 是否有手机验证码  => smsCode（'12345' 或者 ''）
-      };
 
-      // TODO 发送请求
-      fetch(`/web/order/save?_time=${+new Date()}`, {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify(registerRequestBody),
-      }).then((response) => {
-        var res = response.json();
-        
-      }, console.error);
+
+      // 挂号请求
+      // fetch(`/web/order/save?_time=${+new Date()}`, {
+      //   method: "POST",
+      //   credentials: "include",
+      //   body: JSON.stringify(getRegisterRequestBody()),
+      // }).then((response) => {
+      //   var res = response.json();
+
+      // }, console.error);
 
       // TODO 处理验证码
+      // TODO 挂号成功后取消竞态请求
       handler.next(response);
     },
   });
